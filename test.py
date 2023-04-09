@@ -144,28 +144,27 @@ class BplusTree:
                         j.parent = parent_right_node
                     self.insert_in_parent(parentNode, key_, parent_right_node)
 
-    # Delete a node
     def delete(self, key, value):
-        node_ = self.search(key)
+        leaf_node = self.search(key)
         temp = 0
-        for i, item in enumerate(node_.keys):
+        for i, item in enumerate(leaf_node.keys):
             if item == key:
                 temp = 1
 
-                if value in node_.values[i]:
-                    # len(node_.values[i]) for nested list structure
+                if value in leaf_node.values[i]:
+                    # len(leaf_node.values[i]) for nested list structure
                     # If duplicate just remove
-                    if len(node_.values[i]) > 1:
-                        node_.values[i].pop(node_.values[i].index(value))
-                    elif node_ == self.root:
-                        node_.values.pop(i)
-                        node_.keys.pop(i)
+                    if len(leaf_node.values[i]) > 1:
+                        leaf_node.values[i].pop(leaf_node.values[i].index(value))
+                    elif leaf_node == self.root:
+                        leaf_node.values.pop(i)
+                        leaf_node.keys.pop(i)
                     # In case no duplicate, delete first then adjust
                     else:
-                        node_.values[i].pop(node_.values[i].index(value))
-                        del node_.values[i]
-                        node_.keys.pop(node_.keys.index(key))
-                        self.deleteEntry(node_, key, value)
+                        leaf_node.values[i].pop(leaf_node.values[i].index(value))
+                        del leaf_node.values[i]
+                        leaf_node.keys.pop(leaf_node.keys.index(key))
+                        self.deleteEntry(leaf_node, key, value)
                 else:
                     print("Value not in Key")
                     return
@@ -175,7 +174,7 @@ class BplusTree:
 
     # Delete an entry
     def deleteEntry(self, node_, key, value):
-        # If node is internal node, values={node}, keys={key_str}
+        # If node is internal node, values={node}, keys={key_str}, value=child_node, key=child_key
         if not node_.check_leaf:
             for i, item in enumerate(node_.values):
                 if item == value:
@@ -186,11 +185,13 @@ class BplusTree:
                     node_.keys.pop(i)
                     break
 
-        if self.root == node_ and len(node_.values) == 1:
-            self.root = node_.values[0]
-            node_.values[0].parent = None
-            del node_
+        if self.root == node_:
+            if len(node_.values) == 1:
+                self.root = node_.values[0]
+                node_.values[0].parent = None
+                del node_
             return
+        
         elif (len(node_.values) < (node_.order//2 +1) and node_.check_leaf == False) or (len(node_.keys) < (node_.order//2) and node_.check_leaf == True):
             '''
             Adjust when 
@@ -204,7 +205,6 @@ class BplusTree:
             PrevK = -1
             NextK = -1
             # parentNode.values:[children_nodes], parentNode.keys:[key_str]
-            print(f'When delte, parent is: {parentNode.keys}')
             for i, item in enumerate(parentNode.values):
                 if item == node_:
                     if i > 0:
@@ -214,8 +214,15 @@ class BplusTree:
                     if i < len(parentNode.values) - 1:
                         NextNode = parentNode.values[i + 1]
                         NextK = parentNode.keys[i]
-
-            if PrevNode == -1:
+                        
+            if (PrevNode == -1) and (NextNode == -1):
+                if node_.nextKey:
+                    ndash = node_.nextKey
+                    key_ = node_.nextKey.keys[0]
+                else:
+                    ndash = node_.preKey
+                    key_ = node_.preKey.keys[0]            
+            elif PrevNode == -1:
                 ndash = NextNode
                 key_ = NextK
             elif NextNode == -1:
@@ -230,17 +237,25 @@ class BplusTree:
                     is_predecessor = 1
                     ndash = PrevNode
                     key_ = PrevK
-            if isinstance(ndash, int):
-                print('Delete all index')
-                return None
             if len(node_.keys) + len(ndash.keys) < node_.order:
+                # Borrow from right
                 if is_predecessor == 0:
+                    temp_right = ndash.nextKey
+                    temp_left = node_.preKey
                     node_, ndash = ndash, node_
+                else:
+                    temp_right = node_.nextKey
+                    temp_left = ndash.preKey
                 ndash.values += node_.values
+                node_
                 if not node_.check_leaf:
                     ndash.keys.append(key_)
                 else:
                     ndash.nextKey = node_.nextKey
+                    if temp_left:
+                        ndash.preKey = temp_left
+                    if temp_right:
+                        temp_right.preKey = ndash
                 ndash.keys += node_.keys
 
                 if not ndash.check_leaf:
@@ -302,6 +317,7 @@ class BplusTree:
                 if not parentNode.check_leaf:
                     for j in parentNode.values:
                         j.parent = parentNode
+
 
     # Use BFS to check B+tree structure
     def show(self):
